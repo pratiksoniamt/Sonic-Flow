@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "favoriteGenres": { "type": "array", "items": { "type": "string" } },
+        "hasSeenOnboarding": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Track": {
+      "title": "Track",
+      "description": "Music track metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "album": { "type": "string" },
+        "coverArtUrl": { "type": "string" },
+        "url": { "type": "string" },
+        "duration": { "type": "number" },
+        "source": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "artist", "url"]
+    },
+    "Playlist": {
+      "title": "Playlist",
+      "description": "User created playlist",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "users/{userId}/history/{trackId}": {
+      "schema": "Track",
+      "description": "User listening history"
+    },
+    "users/{userId}/likedSongs/{trackId}": {
+      "schema": "Track",
+      "description": "User liked songs"
+    },
+    "playlists/{playlistId}": {
+      "schema": "Playlist",
+      "description": "Global playlists"
+    },
+    "playlists/{playlistId}/tracks/{trackId}": {
+      "schema": "Track",
+      "description": "Tracks within a playlist"
+    }
+  }
+}

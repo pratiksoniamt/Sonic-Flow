@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+
+    function isValidUser(data) {
+      return data.id == request.auth.uid &&
+             data.email == request.auth.token.email &&
+             data.id is string && data.id.size() <= 64 &&
+             data.email is string && data.email.size() <= 256 &&
+             (!data.has('displayName') || (data.displayName is string && data.displayName.size() <= 128)) &&
+             (!data.has('photoURL') || (data.photoURL is string && data.photoURL.size() <= 512)) &&
+             (!data.has('favoriteGenres') || (data.favoriteGenres is list && data.favoriteGenres.size() <= 20)) &&
+             (!data.has('hasSeenOnboarding') || (data.hasSeenOnboarding is bool)) &&
+             (!data.has('musicTasteSelected') || (data.musicTasteSelected is bool));
+    }
+
+    function isValidTrack(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.title is string && data.title.size() <= 256 &&
+             data.artist is string && data.artist.size() <= 256 &&
+             data.url is string && data.url.size() <= 2048 &&
+             (!data.has('album') || (data.album is string && data.album.size() <= 256)) &&
+             (!data.has('coverArtUrl') || (data.coverArtUrl is string && data.coverArtUrl.size() <= 1024)) &&
+             (!data.has('duration') || (data.duration is number)) &&
+             (!data.has('source') || (data.source is string && data.source.size() <= 64));
+    }
+
+    function isValidPlaylist(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() <= 128 &&
+             (data.get('description', '') is string && data.description.size() <= 1024) &&
+             (data.get('coverUrl', '') is string && data.coverUrl.size() <= 1024) &&
+             (data.get('isPublic', false) is bool);
+    }
+
+    // --- Collections ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming()) && (incoming().get('createdAt', request.time) == request.time);
+      allow update: if isOwner(userId) && isValidUser(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'favoriteGenres', 'hasSeenOnboarding', 'musicTasteSelected', 'updatedAt']) &&
+        incoming().updatedAt == request.time &&
+        (incoming().get('createdAt', existing().get('createdAt', request.time)) == existing().get('createdAt', request.time))
+      );
+
+      match /history/{trackId} {
+        allow list, get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTrack(incoming()) && incoming().createdAt == request.time;
+        allow delete: if isOwner(userId);
+      }
+
+      match /likedSongs/{trackId} {
+        allow list, get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTrack(incoming()) && incoming().createdAt == request.time;
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    match /playlists/{playlistId} {
+      function canRead() {
+        return existing().isPublic == true || isOwner(existing().userId);
+      }
+      
+      allow get: if canRead();
+      allow list: if isSignedIn() && (resource.data.isPublic == true || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && isValidPlaylist(incoming()) && incoming().createdAt == request.time;
+      allow update: if isOwner(existing().userId) && isValidPlaylist(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'coverUrl', 'isPublic', 'updatedAt']) &&
+        incoming().updatedAt == request.time &&
+        incoming().createdAt == existing().createdAt
+      );
+      allow delete: if isOwner(existing().userId);
+
+      match /tracks/{trackId} {
+        allow read: if canRead();
+        allow write: if isOwner(get(/databases/$(database)/documents/playlists/$(playlistId)).data.userId);
+      }
+    }
+  }
+}

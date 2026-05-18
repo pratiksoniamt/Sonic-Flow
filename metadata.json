@@ -1,0 +1,6 @@
+{
+  "name": "SonicStream",
+  "description": "A cinematic, futuristic music streaming platform. Paste URLs from any source to instantly build your personal music universe with seamless, uninterrupted playback.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
